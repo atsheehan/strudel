@@ -1,0 +1,6 @@
+[package]
+name = "strudel"
+version = "0.1.0"
+authors = ["Adam Sheehan <a.t.sheehan@gmail.com>"]
+
+[dependencies]
