@@ -48,7 +48,7 @@ fn main() {
 
     println!("Binding to port {}", port);
 
-    let listener = TcpListener::bind(("127.0.0.1", port)).unwrap();
+    let listener = TcpListener::bind(("0.0.0.0", port)).unwrap();
 
     for stream in listener.incoming() {
         match stream {
