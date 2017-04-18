@@ -1,26 +1,36 @@
+use std::str;
+use std::ascii::AsciiExt;
 use ascii;
 
 #[derive(PartialEq)]
 #[derive(Debug)]
-enum HTTPError {
+pub enum HTTPError {
     BadRequest,
     NotImplemented,
     VersionNotSupported,
 }
 
 #[derive(Debug)]
-struct Request<'a> {
-    method: &'a ascii::Ascii,
-    target: &'a ascii::Ascii,
-    http_version: &'a ascii::Ascii,
+pub struct Request<'a> {
+    method: &'a str,
+    target: &'a str,
+    http_version: &'a str,
 }
 
-fn parse_request(buffer: &ascii::Ascii) -> Result<Request, HTTPError> {
+pub fn parse_request(buffer: &ascii::Ascii) -> Result<Request, HTTPError> {
     match ascii::read_line(buffer) {
         Some((line, _buffer)) => {
+            if !line.is_ascii() {
+                return Err(HTTPError::BadRequest);
+            }
+
             let (method, line) = ascii::read_token(line);
             let (target, line) = ascii::read_token(line);
             let (http_version, _) = ascii::read_token(line);
+
+            let method = str::from_utf8(method).unwrap();
+            let target = str::from_utf8(target).unwrap();
+            let http_version = str::from_utf8(http_version).unwrap();
 
             let request = Request { method: method, target: target, http_version: http_version };
             validate_request(request)
@@ -30,10 +40,10 @@ fn parse_request(buffer: &ascii::Ascii) -> Result<Request, HTTPError> {
 }
 
 fn validate_request(request: Request) -> Result<Request, HTTPError> {
-    if request.method != b"GET" {
+    if request.method != "GET" {
         Err(HTTPError::NotImplemented)
     } else {
-        if request.http_version != b"HTTP/1.1" {
+        if request.http_version != "HTTP/1.1" {
             Err(HTTPError::VersionNotSupported)
         } else {
             Ok(request)
@@ -50,9 +60,9 @@ mod tests {
         let input = b"GET /foo HTTP/1.1\r\n\r\n";
         let request = parse_request(input).unwrap();
 
-        assert_eq!(request.method, b"GET");
-        assert_eq!(request.target, b"/foo");
-        assert_eq!(request.http_version, b"HTTP/1.1");
+        assert_eq!(request.method, "GET");
+        assert_eq!(request.target, "/foo");
+        assert_eq!(request.http_version, "HTTP/1.1");
     }
 
     #[test]
@@ -69,5 +79,13 @@ mod tests {
         let error = parse_request(input).unwrap_err();
 
         assert_eq!(error, HTTPError::VersionNotSupported);
+    }
+
+    #[test]
+    fn it_returns_400_if_request_line_contains_non_ascii_chars() {
+        let input = b"GET /foo\xFF HTTP/1.0\r\n\r\n";
+        let error = parse_request(input).unwrap_err();
+
+        assert_eq!(error, HTTPError::BadRequest);
     }
 }
