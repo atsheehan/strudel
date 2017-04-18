@@ -8,6 +8,7 @@ pub enum HTTPError {
     BadRequest,
     NotImplemented,
     VersionNotSupported,
+    NotFound,
 }
 
 #[derive(Debug)]
