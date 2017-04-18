@@ -12,9 +12,9 @@ pub enum HTTPError {
 
 #[derive(Debug)]
 pub struct Request<'a> {
-    method: &'a str,
-    target: &'a str,
-    http_version: &'a str,
+    pub method: &'a str,
+    pub target: &'a str,
+    pub http_version: &'a str,
 }
 
 pub fn parse_request(buffer: &ascii::Ascii) -> Result<Request, HTTPError> {
