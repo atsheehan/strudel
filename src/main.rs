@@ -46,6 +46,8 @@ fn main() {
         Err(_) => DEFAULT_PORT
     };
 
+    println!("Binding to port {}", port);
+
     let listener = TcpListener::bind(("127.0.0.1", port)).unwrap();
 
     for stream in listener.incoming() {
