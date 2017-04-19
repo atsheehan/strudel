@@ -10,43 +10,46 @@ use std::fs::File;
 
 const DEFAULT_PORT: u16 = 4485;
 
-fn generate_response<'a, 'b>(target: &'a str, routes: &'b HashMap<&str, Vec<u8>>) -> &'b [u8] {
+fn write_response(target: &str, mut stream: TcpStream, routes: &HashMap<&str, String>) {
     match routes.get(target) {
-        Some(content) => content.as_slice(),
-        None => generate_error(request::HTTPError::NotFound),
+        Some(content) => {
+            let headers = "HTTP/1.1 200 OK\r\nContent-Type: text/html;charset=utf-8\r\n\r\n";
+            let mut response = String::with_capacity(headers.len() + content.len());
+
+            response.push_str(headers);
+            response.push_str(&content);
+            stream.write(response.as_bytes()).expect("failed to write response");
+        },
+        None => write_error(request::HTTPError::NotFound, stream),
     }
 }
 
-fn generate_error<'a>(error: request::HTTPError) -> &'a [u8] {
-    match error {
-        request::HTTPError::BadRequest => b"HTTP/1.1 400 Bad Request\r\n\r\n",
-        request::HTTPError::NotImplemented => b"HTTP/1.1 501 Not Implemented\r\n\r\n",
-        request::HTTPError::VersionNotSupported => b"HTTP/1.1 505 HTTP Version Not Supported\r\n\r\n",
-        request::HTTPError::NotFound => b"HTTP/1.1 404 Not Found\r\n\r\n",
-    }
+fn write_error(error: request::HTTPError, mut stream: TcpStream) {
+    let contents: &[u8] = match error {
+        request::HTTPError::BadRequest => b"HTTP/1.1 400 Bad Request\r\n\r\nBad Request",
+        request::HTTPError::NotImplemented => b"HTTP/1.1 501 Not Implemented\r\n\r\nNot Implemented",
+        request::HTTPError::VersionNotSupported => b"HTTP/1.1 505 HTTP Version Not Supported\r\n\r\nHTTP Version Not Supported",
+        request::HTTPError::NotFound => b"HTTP/1.1 404 Not Found\r\n\r\nNot Found",
+    };
+
+    stream.write(contents).expect("failed to write response");
 }
 
-fn handle_client(mut stream: TcpStream, routes: &HashMap<&str, Vec<u8>>) {
+fn handle_client(mut stream: TcpStream, routes: &HashMap<&str, String>) {
     let mut buffer = [0; 1024];
     stream.read(&mut buffer).expect("read failed");
 
     match request::parse_request(&buffer) {
-        Ok(request) => {
-            let response = generate_response(request.target, routes);
-            stream.write(response).expect("write failed");
-        },
-        Err(error) => {
-            let response = generate_error(error);
-            stream.write(response).expect("write failed");
-        },
-    }
+        Ok(request) => write_response(request.target, stream, routes),
+        Err(error) => write_error(error, stream),
+    };
 }
 
-fn read_file(path: &str) -> Vec<u8> {
+fn read_file(path: &str) -> String {
     let mut file = File::open(path).expect(&format!("Could not open file at {}", path));
-    let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer).expect(&format!("Failed to read {}", path));
-    buffer
+    let mut contents = String::new();
+    file.read_to_string(&mut contents).expect(&format!("Failed to read {}", path));
+    contents
 }
 
 fn main() {
@@ -57,7 +60,7 @@ fn main() {
 
     println!("Binding to port {}", port);
 
-    let mut routes: HashMap<&str, Vec<u8>> = HashMap::new();
+    let mut routes: HashMap<&str, String> = HashMap::new();
     routes.insert("/", read_file("templates/home.html"));
 
     let listener = TcpListener::bind(("0.0.0.0", port)).unwrap();
