@@ -8,16 +8,16 @@ use std::str;
 
 const DEFAULT_PORT: u16 = 4485;
 
-fn generate_response(target: &str) -> &str {
-    "HTTP/1.1 200 OK\r\n\r\nreplace me"
+fn generate_response(target: &str) -> &[u8] {
+    b"HTTP/1.1 200 OK\r\n\r\nreplace me"
 }
 
-fn generate_error<'a>(error: request::HTTPError) -> &'a str {
+fn generate_error<'a>(error: request::HTTPError) -> &'a [u8] {
     match error {
-        request::HTTPError::BadRequest => "HTTP/1.1 400 Bad Request\r\n\r\n",
-        request::HTTPError::NotImplemented => "HTTP/1.1 501 Not Implemented\r\n\r\n",
-        request::HTTPError::VersionNotSupported => "HTTP/1.1 505 HTTP Version Not Supported\r\n\r\n",
-        request::HTTPError::NotFound => "HTTP/1.1 404 Not Found\r\n\r\n",
+        request::HTTPError::BadRequest => b"HTTP/1.1 400 Bad Request\r\n\r\n",
+        request::HTTPError::NotImplemented => b"HTTP/1.1 501 Not Implemented\r\n\r\n",
+        request::HTTPError::VersionNotSupported => b"HTTP/1.1 505 HTTP Version Not Supported\r\n\r\n",
+        request::HTTPError::NotFound => b"HTTP/1.1 404 Not Found\r\n\r\n",
     }
 }
 
@@ -27,15 +27,12 @@ fn handle_client(mut stream: TcpStream) {
 
     match request::parse_request(&buffer) {
         Ok(request) => {
-            let response = match request.target {
-                "/" => generate_response("/"),
-                _ => generate_error(request::HTTPError::NotFound),
-            };
-            stream.write(response.as_bytes()).expect("write failed");
+            let response = generate_response(request.target);
+            stream.write(response).expect("write failed");
         },
         Err(error) => {
             let response = generate_error(error);
-            stream.write(response.as_bytes()).expect("write failed");
+            stream.write(response).expect("write failed");
         },
     }
 }
