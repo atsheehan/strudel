@@ -67,6 +67,18 @@ fn parse_request_line(line: &str) -> Option<RequestLine> {
     }
 }
 
+fn validate_request_line(request: RequestLine) -> Result<RequestLine, HTTPError> {
+    if request.http_version != "HTTP/1.1" {
+        return Err(HTTPError::VersionNotSupported);
+    }
+
+    if request.method != "GET" {
+        return Err(HTTPError::NotImplemented);
+    }
+
+    Ok(request)
+}
+
 fn parse_request_headers(mut buffer: &[u8]) -> Option<HashMap<String, &str>> {
     let mut headers = HashMap::new();
 
@@ -92,18 +104,6 @@ fn parse_request_headers(mut buffer: &[u8]) -> Option<HashMap<String, &str>> {
             None => return None,
         };
     }
-}
-
-fn validate_request_line(request: RequestLine) -> Result<RequestLine, HTTPError> {
-    if request.http_version != "HTTP/1.1" {
-        return Err(HTTPError::VersionNotSupported);
-    }
-
-    if request.method != "GET" {
-        return Err(HTTPError::NotImplemented);
-    }
-
-    Ok(request)
 }
 
 const LINE_FEED: u8 = 10;
