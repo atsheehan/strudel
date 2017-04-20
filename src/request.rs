@@ -52,6 +52,35 @@ fn validate_request(request: Request) -> Result<Request, HTTPError> {
     }
 }
 
+const LINE_FEED: u8 = 10;
+const CARRIAGE_RETURN: u8 = 13;
+
+/// Returns the next line from a request header. The line must be
+/// terminated by a CRLF pair according to Section 3 of RFC 7230. If
+/// the header does not contain a CRLF or the line is not
+/// ASCII-encoded, returns None.
+fn read_header_line<'a>(header: &'a [u8]) -> Option<(&'a str, &'a [u8])> {
+    let mut cr_found = false;
+
+    for (index, byte) in header.iter().enumerate() {
+        if *byte == CARRIAGE_RETURN {
+            cr_found = true;
+        } else if cr_found && *byte == LINE_FEED {
+            let line = &header[..(index - 1)];
+            let remaining = &header[(index + 1)..];
+
+            return match str::from_utf8(line) {
+                Ok(line) => Some((line, remaining)),
+                Err(_) => None,
+            }
+        } else {
+            cr_found = false;
+        }
+    }
+
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -88,5 +117,30 @@ mod tests {
         let error = parse_request(input).unwrap_err();
 
         assert_eq!(error, HTTPError::BadRequest);
+    }
+
+    #[test]
+    fn read_header_line_reads_consecutive_lines_split_by_crlf() {
+        let buffer = b"first line\r\nsecond line\r\n";
+
+        let (first_line, buffer) = read_header_line(buffer).unwrap();
+        let (second_line, _) = read_header_line(buffer).unwrap();
+
+        assert_eq!(first_line, "first line");
+        assert_eq!(second_line, "second line");
+    }
+
+    #[test]
+    fn read_header_line_returns_none_if_missing_crlf() {
+        let buffer = b"no crlf";
+        let result = read_header_line(buffer);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn read_header_line_returns_none_if_line_isnt_ascii() {
+        let buffer = b"non-ascii \xFF char\r\n";
+        let result = read_header_line(buffer);
+        assert!(result.is_none());
     }
 }
