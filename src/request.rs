@@ -1,6 +1,4 @@
 use std::str;
-use std::ascii::AsciiExt;
-use ascii;
 
 #[derive(PartialEq)]
 #[derive(Debug)]
@@ -18,20 +16,25 @@ pub struct Request<'a> {
     pub http_version: &'a str,
 }
 
-pub fn parse_request(buffer: &ascii::Ascii) -> Result<Request, HTTPError> {
-    match ascii::read_line(buffer) {
+pub fn parse_request(buffer: &[u8]) -> Result<Request, HTTPError> {
+    match read_header_line(buffer) {
         Some((line, _buffer)) => {
-            if !line.is_ascii() {
-                return Err(HTTPError::BadRequest);
-            }
+            let mut tokens = line.split_whitespace();
 
-            let (method, line) = ascii::read_token(line);
-            let (target, line) = ascii::read_token(line);
-            let (http_version, _) = ascii::read_token(line);
+            let method = match tokens.next() {
+                Some(token) => token,
+                None => return Err(HTTPError::BadRequest),
+            };
 
-            let method = str::from_utf8(method).unwrap();
-            let target = str::from_utf8(target).unwrap();
-            let http_version = str::from_utf8(http_version).unwrap();
+            let target = match tokens.next() {
+                Some(token) => token,
+                None => return Err(HTTPError::BadRequest),
+            };
+
+            let http_version = match tokens.next() {
+                Some(token) => token,
+                None => return Err(HTTPError::BadRequest),
+            };
 
             let request = Request { method: method, target: target, http_version: http_version };
             validate_request(request)
