@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::str;
 
 #[derive(PartialEq)]
@@ -10,37 +11,89 @@ pub enum HTTPError {
 }
 
 #[derive(Debug)]
-pub struct Request<'a> {
+pub struct RequestLine<'a> {
     pub method: &'a str,
     pub target: &'a str,
     pub http_version: &'a str,
 }
 
+#[derive(Debug)]
+pub struct Request<'a> {
+    pub method: &'a str,
+    pub target: &'a str,
+    pub http_version: &'a str,
+    pub headers: HashMap<&'a str, &'a str>,
+}
+
 pub fn parse_request(buffer: &[u8]) -> Result<Request, HTTPError> {
     match read_header_line(buffer) {
-        Some((line, _buffer)) => {
+        Some((line, buffer)) => {
             let request_line = match parse_request_line(line) {
                 Some(request_line) => request_line,
                 None => return Err(HTTPError::BadRequest),
             };
 
-            validate_request(request_line)
+            match validate_request_line(request_line) {
+                Ok(request_line) => {
+                    match parse_request_headers(buffer) {
+                        Some(headers) => {
+                            let request = Request {
+                                method: request_line.method,
+                                target: request_line.target,
+                                http_version: request_line.http_version,
+                                headers: headers,
+                            };
+
+                            Ok(request)
+                        },
+                        None => Err(HTTPError::BadRequest),
+                    }
+                },
+                Err(error) => Err(error),
+            }
         },
         None => Err(HTTPError::BadRequest)
     }
 }
 
-fn parse_request_line(line: &str) -> Option<Request> {
+fn parse_request_line(line: &str) -> Option<RequestLine> {
     let tokens: Vec<&str> = line.split(' ').collect();
 
     if tokens.len() == 3 {
-        Some(Request { method: tokens[0], target: tokens[1], http_version: tokens[2] })
+        Some(RequestLine { method: tokens[0], target: tokens[1], http_version: tokens[2] })
     } else {
         None
     }
 }
 
-fn validate_request(request: Request) -> Result<Request, HTTPError> {
+fn parse_request_headers(mut buffer: &[u8]) -> Option<HashMap<&str, &str>> {
+    let mut headers = HashMap::new();
+
+    loop {
+        match read_header_line(buffer) {
+            Some((line, remaining)) => {
+                buffer = remaining;
+
+                if line.is_empty() {
+                    return Some(headers);
+                }
+
+                let tokens: Vec<&str> = line.split(':').collect();
+                if tokens.len() != 2 {
+                    return None;
+                }
+
+                let key = tokens[0];
+                let value = tokens[1].trim();
+
+                headers.insert(key, value);
+            },
+            None => return None,
+        };
+    }
+}
+
+fn validate_request_line(request: RequestLine) -> Result<RequestLine, HTTPError> {
     if request.http_version != "HTTP/1.1" {
         return Err(HTTPError::VersionNotSupported);
     }
@@ -93,6 +146,15 @@ mod tests {
         assert_eq!(request.method, "GET");
         assert_eq!(request.target, "/foo");
         assert_eq!(request.http_version, "HTTP/1.1");
+    }
+
+    #[test]
+    fn parse_request_with_headers() {
+        let input = b"GET /foo HTTP/1.1\r\nHost: example.com\r\nAccept: text/html\r\n\r\n";
+        let request = parse_request(input).unwrap();
+
+        assert_eq!(*request.headers.get("Host").unwrap(), "example.com");
+        assert_eq!(*request.headers.get("Accept").unwrap(), "text/html");
     }
 
     #[test]
