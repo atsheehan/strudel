@@ -79,7 +79,7 @@ fn parse_request_headers(mut buffer: &[u8]) -> Option<HashMap<String, &str>> {
                     return Some(headers);
                 }
 
-                let tokens: Vec<&str> = line.split(':').collect();
+                let tokens: Vec<&str> = line.splitn(2, ':').collect();
                 if tokens.len() != 2 {
                     return None;
                 }
@@ -156,6 +156,14 @@ mod tests {
 
         assert_eq!(*request.headers.get("host").unwrap(), "example.com");
         assert_eq!(*request.headers.get("accept").unwrap(), "text/html");
+    }
+
+    #[test]
+    fn parse_request_when_header_value_includes_colon() {
+        let input = b"GET /foo HTTP/1.1\r\nHost: localhost:4485\r\n\r\n";
+        let request = parse_request(input).unwrap();
+
+        assert_eq!(*request.headers.get("host").unwrap(), "localhost:4485");
     }
 
     #[test]
