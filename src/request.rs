@@ -1,3 +1,4 @@
+use std::ascii::AsciiExt;
 use std::collections::HashMap;
 use std::str;
 
@@ -22,7 +23,7 @@ pub struct Request<'a> {
     pub method: &'a str,
     pub target: &'a str,
     pub http_version: &'a str,
-    pub headers: HashMap<&'a str, &'a str>,
+    pub headers: HashMap<String, &'a str>,
 }
 
 pub fn parse_request(buffer: &[u8]) -> Result<Request, HTTPError> {
@@ -66,7 +67,7 @@ fn parse_request_line(line: &str) -> Option<RequestLine> {
     }
 }
 
-fn parse_request_headers(mut buffer: &[u8]) -> Option<HashMap<&str, &str>> {
+fn parse_request_headers(mut buffer: &[u8]) -> Option<HashMap<String, &str>> {
     let mut headers = HashMap::new();
 
     loop {
@@ -83,7 +84,7 @@ fn parse_request_headers(mut buffer: &[u8]) -> Option<HashMap<&str, &str>> {
                     return None;
                 }
 
-                let key = tokens[0];
+                let key = tokens[0].to_ascii_lowercase();
                 let value = tokens[1].trim();
 
                 headers.insert(key, value);
@@ -153,8 +154,8 @@ mod tests {
         let input = b"GET /foo HTTP/1.1\r\nHost: example.com\r\nAccept: text/html\r\n\r\n";
         let request = parse_request(input).unwrap();
 
-        assert_eq!(*request.headers.get("Host").unwrap(), "example.com");
-        assert_eq!(*request.headers.get("Accept").unwrap(), "text/html");
+        assert_eq!(*request.headers.get("host").unwrap(), "example.com");
+        assert_eq!(*request.headers.get("accept").unwrap(), "text/html");
     }
 
     #[test]
