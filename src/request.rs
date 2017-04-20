@@ -101,7 +101,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_parses_a_request_with_no_headers() {
+    fn parse_request_with_no_headers() {
         let input = b"GET /foo HTTP/1.1\r\n\r\n";
         let request = parse_request(input).unwrap();
 
@@ -111,7 +111,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_request_generates_400_if_request_line_has_too_many_words() {
+    fn parse_request_returns_400_if_request_line_has_too_many_words() {
         let input = b"GET /foo HTTP/1.1 bar\r\n\r\n";
         let error = parse_request(input).unwrap_err();
 
@@ -119,7 +119,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_request_generates_400_if_request_line_has_too_few_words() {
+    fn parse_request_returns_400_if_request_line_has_too_few_words() {
         let input = b"GET /foo\r\n\r\n";
         let error = parse_request(input).unwrap_err();
 
@@ -127,7 +127,7 @@ mod tests {
     }
 
     #[test]
-    fn it_returns_501_for_unrecognized_methods() {
+    fn parse_request_returns_501_for_unrecognized_methods() {
         let input = b"PROPFIND /foo HTTP/1.1\r\n\r\n";
         let error = parse_request(input).unwrap_err();
 
@@ -135,7 +135,7 @@ mod tests {
     }
 
     #[test]
-    fn it_returns_505_unless_using_http_1_1() {
+    fn parse_request_returns_505_unless_using_http_1_1() {
         let input = b"GET /foo HTTP/1.0\r\n\r\n";
         let error = parse_request(input).unwrap_err();
 
@@ -143,7 +143,7 @@ mod tests {
     }
 
     #[test]
-    fn it_returns_400_if_request_line_contains_non_ascii_chars() {
+    fn parse_request_returns_400_if_request_line_contains_non_ascii_chars() {
         let input = b"GET /foo\xFF HTTP/1.0\r\n\r\n";
         let error = parse_request(input).unwrap_err();
 
