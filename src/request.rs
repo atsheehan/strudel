@@ -19,28 +19,40 @@ pub struct Request<'a> {
 pub fn parse_request(buffer: &[u8]) -> Result<Request, HTTPError> {
     match read_header_line(buffer) {
         Some((line, _buffer)) => {
-            let mut tokens = line.split_whitespace();
-
-            let method = match tokens.next() {
-                Some(token) => token,
+            let request_line = match parse_request_line(line) {
+                Some(request_line) => request_line,
                 None => return Err(HTTPError::BadRequest),
             };
 
-            let target = match tokens.next() {
-                Some(token) => token,
-                None => return Err(HTTPError::BadRequest),
-            };
-
-            let http_version = match tokens.next() {
-                Some(token) => token,
-                None => return Err(HTTPError::BadRequest),
-            };
-
-            let request = Request { method: method, target: target, http_version: http_version };
-            validate_request(request)
+            validate_request(request_line)
         },
         None => Err(HTTPError::BadRequest)
     }
+}
+
+fn parse_request_line(line: &str) -> Option<Request> {
+    let mut tokens = line.split_whitespace();
+
+    let method = match tokens.next() {
+        Some(token) => token,
+        None => return None,
+    };
+
+    let target = match tokens.next() {
+        Some(token) => token,
+        None => return None,
+    };
+
+    let http_version = match tokens.next() {
+        Some(token) => token,
+        None => return None,
+    };
+
+    if !tokens.next().is_none() {
+        return None;
+    }
+
+    Some(Request { method: method, target: target, http_version: http_version })
 }
 
 fn validate_request(request: Request) -> Result<Request, HTTPError> {
@@ -96,6 +108,22 @@ mod tests {
         assert_eq!(request.method, "GET");
         assert_eq!(request.target, "/foo");
         assert_eq!(request.http_version, "HTTP/1.1");
+    }
+
+    #[test]
+    fn parse_request_generates_400_if_request_line_has_too_many_words() {
+        let input = b"GET /foo HTTP/1.1 bar\r\n\r\n";
+        let error = parse_request(input).unwrap_err();
+
+        assert_eq!(error, HTTPError::BadRequest);
+    }
+
+    #[test]
+    fn parse_request_generates_400_if_request_line_has_too_few_words() {
+        let input = b"GET /foo\r\n\r\n";
+        let error = parse_request(input).unwrap_err();
+
+        assert_eq!(error, HTTPError::BadRequest);
     }
 
     #[test]
