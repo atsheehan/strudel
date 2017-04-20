@@ -9,8 +9,14 @@ use std::fs::File;
 
 const DEFAULT_PORT: u16 = 4485;
 
-fn write_response(target: &str, mut stream: TcpStream, routes: &HashMap<&str, String>) {
-    match routes.get(target) {
+fn write_response(request: request::Request, mut stream: TcpStream, routes: &HashMap<&str, String>) {
+    println!("REQUEST -- {} {} {}", request.method, request.target, request.http_version);
+    for (header, value) in &request.headers {
+        println!("{}: \"{}\"", header, value);
+    }
+    println!();
+
+    match routes.get(request.target) {
         Some(content) => {
             let headers = "HTTP/1.1 200 OK\r\nContent-Type: text/html;charset=utf-8\r\n\r\n";
             let mut response = String::with_capacity(headers.len() + content.len());
@@ -39,7 +45,7 @@ fn handle_client(mut stream: TcpStream, routes: &HashMap<&str, String>) {
     stream.read(&mut buffer).expect("read failed");
 
     match request::parse_request(&buffer) {
-        Ok(request) => write_response(request.target, stream, routes),
+        Ok(request) => write_response(request, stream, routes),
         Err(error) => write_error(error, stream),
     };
 }
@@ -56,8 +62,6 @@ fn main() {
         Ok(port) => port.trim().parse().expect("$PORT is not an integer"),
         Err(_) => DEFAULT_PORT
     };
-
-    println!("Binding to port {}", port);
 
     let mut routes: HashMap<&str, String> = HashMap::new();
     routes.insert("/", read_file("templates/home.html"));
