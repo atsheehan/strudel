@@ -56,15 +56,15 @@ fn parse_request_line(line: &str) -> Option<Request> {
 }
 
 fn validate_request(request: Request) -> Result<Request, HTTPError> {
-    if request.method != "GET" {
-        Err(HTTPError::NotImplemented)
-    } else {
-        if request.http_version != "HTTP/1.1" {
-            Err(HTTPError::VersionNotSupported)
-        } else {
-            Ok(request)
-        }
+    if request.http_version != "HTTP/1.1" {
+        return Err(HTTPError::VersionNotSupported);
     }
+
+    if request.method != "GET" {
+        return Err(HTTPError::NotImplemented);
+    }
+
+    Ok(request)
 }
 
 const LINE_FEED: u8 = 10;
