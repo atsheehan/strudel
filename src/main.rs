@@ -1,5 +1,4 @@
 mod request;
-mod ascii;
 
 use std::io::prelude::*;
 use std::env;
