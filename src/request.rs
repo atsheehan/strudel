@@ -31,28 +31,13 @@ pub fn parse_request(buffer: &[u8]) -> Result<Request, HTTPError> {
 }
 
 fn parse_request_line(line: &str) -> Option<Request> {
-    let mut tokens = line.split_whitespace();
+    let tokens: Vec<&str> = line.split(' ').collect();
 
-    let method = match tokens.next() {
-        Some(token) => token,
-        None => return None,
-    };
-
-    let target = match tokens.next() {
-        Some(token) => token,
-        None => return None,
-    };
-
-    let http_version = match tokens.next() {
-        Some(token) => token,
-        None => return None,
-    };
-
-    if !tokens.next().is_none() {
-        return None;
+    if tokens.len() == 3 {
+        Some(Request { method: tokens[0], target: tokens[1], http_version: tokens[2] })
+    } else {
+        None
     }
-
-    Some(Request { method: method, target: target, http_version: http_version })
 }
 
 fn validate_request(request: Request) -> Result<Request, HTTPError> {
@@ -121,6 +106,22 @@ mod tests {
     #[test]
     fn parse_request_returns_400_if_request_line_has_too_few_words() {
         let input = b"GET /foo\r\n\r\n";
+        let error = parse_request(input).unwrap_err();
+
+        assert_eq!(error, HTTPError::BadRequest);
+    }
+
+    #[test]
+    fn parse_request_returns_400_if_request_line_has_more_than_single_space() {
+        let input = b"GET  /foo HTTP/1.1\r\n\r\n";
+        let error = parse_request(input).unwrap_err();
+
+        assert_eq!(error, HTTPError::BadRequest);
+    }
+
+    #[test]
+    fn parse_request_returns_400_if_request_line_uses_other_whitespace() {
+        let input = b"GET\t/foo HTTP/1.1\r\n\r\n";
         let error = parse_request(input).unwrap_err();
 
         assert_eq!(error, HTTPError::BadRequest);
