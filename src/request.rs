@@ -26,6 +26,26 @@ pub struct Request<'a> {
     pub headers: HashMap<String, &'a str>,
 }
 
+impl<'a> Request<'a> {
+    pub fn is_websocket(&self) -> bool {
+        self.method == "GET" &&
+            self.connection_options().iter().any(|option| option == "upgrade") &&
+            self.headers.get("upgrade").map_or(
+                false, |upgrade| upgrade.trim().to_ascii_lowercase() == "websocket")
+    }
+
+    fn connection_options(&self) -> Vec<String> {
+        match self.headers.get("connection") {
+            Some(connection) => {
+                connection.split(',')
+                    .map(|token| token.trim().to_ascii_lowercase())
+                    .collect()
+            },
+            None => Vec::new(),
+        }
+    }
+}
+
 pub fn parse_request(buffer: &[u8]) -> Result<Request, HTTPError> {
     match read_header_line(buffer) {
         Some((line, buffer)) => {
@@ -220,6 +240,22 @@ mod tests {
         let error = parse_request(input).unwrap_err();
 
         assert_eq!(error, HTTPError::BadRequest);
+    }
+
+    #[test]
+    fn request_is_websocket_is_false_unless_connection_and_upgrade_headers_set() {
+        let input = b"GET /foo HTTP/1.1\r\nConnection: keep-alive\r\n\r\n";
+        let request = parse_request(input).unwrap();
+
+        assert!(!request.is_websocket());
+    }
+
+    #[test]
+    fn request_is_websocket_if_connection_and_upgrade_headers_set() {
+        let input = b"GET /socket HTTP/1.1\r\nConnection: keep-alive, Upgrade\r\nUpgrade: websocket\r\n\r\n";
+        let request = parse_request(input).unwrap();
+
+        assert!(request.is_websocket());
     }
 
     #[test]
