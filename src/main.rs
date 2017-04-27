@@ -1,4 +1,5 @@
 mod request;
+mod sha1;
 
 use std::io::prelude::*;
 use std::env;
