@@ -231,6 +231,24 @@ mod tests {
     }
 
     #[test]
+    fn sha1_digest_can_accept_input_in_chunks() {
+        let chunk: [u8; 50] = [b'a'; 50];
+        let full_input: [u8; 150] = [b'a'; 150];
+
+        let mut chunk_context = SHA1Context::new();
+
+        chunk_context.add(&chunk);
+        chunk_context.add(&chunk);
+        chunk_context.add(&chunk);
+
+        let mut full_context = SHA1Context::new();
+
+        full_context.add(&full_input);
+
+        assert_eq!(chunk_context.digest(), full_context.digest());
+    }
+
+    #[test]
     fn bytes_to_word_properly_converts() {
         assert_eq!(bytes_to_word([0, 0, 0, 0]), 0);
         assert_eq!(bytes_to_word([0, 0, 0, 0xff]), 255);
