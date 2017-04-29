@@ -72,23 +72,32 @@ pub fn encode(input: &[u8]) -> Vec<u8> {
     let mut output = Vec::new();
 
     for chunk in input.chunks(3) {
-        let mut buffer: [u8; 3] = [0; 3];
+        let mut word: u32 = 0;
 
         for (index, byte) in chunk.iter().enumerate() {
-            buffer[index] = *byte;
+            let bitshift = 24 - (index * 8);
+            word |= (*byte as u32) << bitshift;
         }
 
-        let word: u32 = (buffer[0] as u32) << 24 | (buffer[1] as u32) << 16 | (buffer[2] as u32) << 8;
+        output.push(encode_byte((word >> 26) as u8 & 0b00111111));
+        output.push(encode_byte((word >> 20) as u8 & 0b00111111));
 
-        let a = encode_byte((word >> 26) as u8 & 0b00111111);
-        let b = encode_byte((word >> 20) as u8 & 0b00111111);
-        let c = encode_byte((word >> 14) as u8 & 0b00111111);
-        let d = encode_byte((word >> 8) as u8 & 0b00111111);
+        match chunk.len() {
+            1 => {
+                output.push(b'=');
+                output.push(b'=');
+            },
+            2 => {
+                output.push(encode_byte((word >> 14) as u8 & 0b00111111));
+                output.push(b'=');
+            },
+            3 => {
+                output.push(encode_byte((word >> 14) as u8 & 0b00111111));
+                output.push(encode_byte((word >> 8) as u8 & 0b00111111));
+            },
+            _ => panic!(),
+        };
 
-        output.push(a);
-        output.push(b);
-        output.push(c);
-        output.push(d);
     }
 
     output
@@ -105,11 +114,11 @@ mod tests {
         assert_eq!(&encode(b"foobar"), b"Zm9vYmFy");
     }
 
-    // #[test]
-    // fn encode_passes_test_cases_with_padding_from_rfc4648() {
-    //     assert_eq!(&encode(b"f"), b"Zg==");
-    //     assert_eq!(&encode(b"fo"), b"Zm8=");
-    //     assert_eq!(&encode(b"foob"), b"Zm9vYg==");
-    //     assert_eq!(&encode(b"fooba"), b"Zm9vYmE=");
-    // }
+    #[test]
+    fn encode_passes_test_cases_with_padding_from_rfc4648() {
+        assert_eq!(&encode(b"f"), b"Zg==");
+        assert_eq!(&encode(b"fo"), b"Zm8=");
+        assert_eq!(&encode(b"foob"), b"Zm9vYg==");
+        assert_eq!(&encode(b"fooba"), b"Zm9vYmE=");
+    }
 }
