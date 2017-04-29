@@ -1,3 +1,4 @@
+mod base64;
 mod request;
 mod sha1;
 
