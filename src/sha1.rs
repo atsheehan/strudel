@@ -1,64 +1,87 @@
 struct SHA1Context {
     input_buffer: [u8; 64],
+    input_index: usize,
     length: u64,
+    h: [u32; 5],
 }
+
+const H_INIT: [u32; 5] = [
+    0x67452301,
+    0xEFCDAB89,
+    0x98BADCFE,
+    0x10325476,
+    0xC3D2E1F0,
+];
 
 impl SHA1Context {
     fn new() -> SHA1Context {
-        SHA1Context { input_buffer: [0; 64], length: 0, }
+        SHA1Context { input_buffer: [0; 64], input_index: 0, length: 0, h: H_INIT }
     }
 
-    fn add(&mut self, message: &[u8]) {
-        self.length = message.len() as u64;
+    fn add(&mut self, mut new_input: &[u8]) {
+        self.length += new_input.len() as u64;
+        let mut bytes_til_full_block = self.input_buffer.len() - self.input_index;
 
-        for (index, byte) in message.iter().enumerate() {
-            self.input_buffer[index] = *byte;
+        while new_input.len() >= bytes_til_full_block {
+            let filler: &[u8] = &new_input[..bytes_til_full_block];
+
+            for (offset, byte) in filler.iter().enumerate() {
+                self.input_buffer[self.input_index + offset] = *byte;
+            }
+
+            self.h = process_message_block(self.input_buffer, self.h);
+
+            self.input_index = 0;
+            new_input = &new_input[bytes_til_full_block..];
+            bytes_til_full_block = self.input_buffer.len();
         }
+
+        for (offset, byte) in new_input.iter().enumerate() {
+            self.input_buffer[self.input_index + offset] = *byte;
+        }
+
+        self.input_index += new_input.len();
     }
 
     fn digest(&mut self) -> [u8; 20] {
-        self.input_buffer[self.length as usize] = 0x80;
+        self.input_buffer[self.input_index] = 0x80;
 
-        let mut h: [u32; 5] = [
-            0x67452301,
-            0xEFCDAB89,
-            0x98BADCFE,
-            0x10325476,
-            0xC3D2E1F0,
-        ];
+        for index in (self.input_index + 1)..self.input_buffer.len() {
+            self.input_buffer[index] = 0;
+        }
 
-        if self.length > 55 {
-            h = process_message_block(self.input_buffer, h);
+        if self.input_index > 55 {
+            self.h = process_message_block(self.input_buffer, self.h);
             self.input_buffer = [0; 64];
         }
 
-        for (index, byte) in self.length_bytes().iter().enumerate() {
-            self.input_buffer[56 + index] = *byte;
+        for (offset, byte) in self.length_bytes().iter().enumerate() {
+            self.input_buffer[56 + offset] = *byte;
         }
 
-        h = process_message_block(self.input_buffer, h);
+        self.h = process_message_block(self.input_buffer, self.h);
 
         [
-            (h[0] >> 24) as u8,
-            (h[0] >> 16) as u8,
-            (h[0] >> 8) as u8,
-            h[0] as u8,
-            (h[1] >> 24) as u8,
-            (h[1] >> 16) as u8,
-            (h[1] >> 8) as u8,
-            h[1] as u8,
-            (h[2] >> 24) as u8,
-            (h[2] >> 16) as u8,
-            (h[2] >> 8) as u8,
-            h[2] as u8,
-            (h[3] >> 24) as u8,
-            (h[3] >> 16) as u8,
-            (h[3] >> 8) as u8,
-            h[3] as u8,
-            (h[4] >> 24) as u8,
-            (h[4] >> 16) as u8,
-            (h[4] >> 8) as u8,
-            h[4] as u8,
+            (self.h[0] >> 24) as u8,
+            (self.h[0] >> 16) as u8,
+            (self.h[0] >> 8) as u8,
+            self.h[0] as u8,
+            (self.h[1] >> 24) as u8,
+            (self.h[1] >> 16) as u8,
+            (self.h[1] >> 8) as u8,
+            self.h[1] as u8,
+            (self.h[2] >> 24) as u8,
+            (self.h[2] >> 16) as u8,
+            (self.h[2] >> 8) as u8,
+            self.h[2] as u8,
+            (self.h[3] >> 24) as u8,
+            (self.h[3] >> 16) as u8,
+            (self.h[3] >> 8) as u8,
+            self.h[3] as u8,
+            (self.h[4] >> 24) as u8,
+            (self.h[4] >> 16) as u8,
+            (self.h[4] >> 8) as u8,
+            self.h[4] as u8,
         ]
     }
 
@@ -183,6 +206,22 @@ mod tests {
         let expected = [
             0x84, 0x98, 0x3E, 0x44, 0x1C, 0x3B, 0xD2, 0x6E, 0xBA, 0xAE,
             0x4A, 0xA1, 0xF9, 0x51, 0x29, 0xE5, 0xE5, 0x46, 0x70, 0xF1,
+        ];
+
+        let mut context = SHA1Context::new();
+        context.add(input);
+
+        assert_eq!(context.digest(), expected);
+    }
+
+    #[test]
+    fn sha1_digest_processes_512_bits_of_input() {
+        // The input here is an exactly 512 bits.
+        let input = b"0123456701234567012345670123456701234567012345670123456701234567";
+
+        let expected = [
+            0xE0, 0xC0, 0x94, 0xE8, 0x67, 0xEF, 0x46, 0xC3, 0x50, 0xEF,
+            0x54, 0xA7, 0xF5, 0x9D, 0xD6, 0x0B, 0xED, 0x92, 0xAE, 0x83,
         ];
 
         let mut context = SHA1Context::new();
