@@ -5,5 +5,13 @@
   </head>
   <body>
     <h1>Hi</h1>
+
+    <script>
+     const socket = new WebSocket('ws://localhost:4485/socket');
+
+     socket.addEventListener('open', function(event) {
+       console.log('Connection opened');
+     });
+    </script>
   </body>
 </html>

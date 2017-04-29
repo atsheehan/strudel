@@ -16,19 +16,61 @@ fn write_response(request: request::Request, mut stream: TcpStream, routes: &Has
     for (header, value) in &request.headers {
         println!("{}: \"{}\"", header, value);
     }
-    println!();
+    println!("\nis_websocket: {}\n\n", request.is_websocket());
 
-    match routes.get(request.target) {
-        Some(content) => {
-            let headers = "HTTP/1.1 200 OK\r\nContent-Type: text/html;charset=utf-8\r\n\r\n";
-            let mut response = String::with_capacity(headers.len() + content.len());
+    if request.is_websocket() {
+        connect_websocket(request, stream);
+    } else {
+        match routes.get(request.target) {
+            Some(content) => {
+                let headers = "HTTP/1.1 200 OK\r\nContent-Type: text/html;charset=utf-8\r\n\r\n";
+                let mut response = String::with_capacity(headers.len() + content.len());
 
-            response.push_str(headers);
-            response.push_str(&content);
-            stream.write(response.as_bytes()).expect("failed to write response");
-        },
-        None => write_error(request::HTTPError::NotFound, stream),
+                response.push_str(headers);
+                response.push_str(&content);
+                stream.write(response.as_bytes()).expect("failed to write response");
+            },
+            None => write_error(request::HTTPError::NotFound, stream),
+        }
     }
+}
+
+const BONUS_STRING: &str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+
+fn connect_websocket(request: request::Request, mut stream: TcpStream) {
+    if !request.headers.get("sec-websocket-version").map_or(false, |version| *version == "13") {
+        write_error(request::HTTPError::BadRequest, stream);
+        return;
+    }
+
+    let websocket_key = match request.headers.get("sec-websocket-key") {
+        Some(key) => key,
+        None => {
+            write_error(request::HTTPError::BadRequest, stream);
+            return;
+        },
+    };
+
+    let websocket_key = websocket_key.to_string() + BONUS_STRING;
+
+    println!("websocket key: {}", websocket_key);
+
+    let mut digester = sha1::SHA1Context::new();
+    digester.add(&websocket_key.as_bytes());
+    let websocket_key_bytes = digester.digest();
+
+    let encoded_websocket_key = base64::encode(&websocket_key_bytes);
+
+    let mut output_buffer: Vec<u8> = Vec::new();
+
+    output_buffer.extend_from_slice(b"HTTP/1.1 101 Switching Protocols\r\n");
+    output_buffer.extend_from_slice(b"Upgrade: websocket\r\n");
+    output_buffer.extend_from_slice(b"Connection: Upgrade\r\n");
+    output_buffer.extend_from_slice(b"Sec-WebSocket-Accept: ");
+    output_buffer.extend_from_slice(&encoded_websocket_key);
+    output_buffer.extend_from_slice(b"\r\n\r\n");
+
+    stream.write(&output_buffer).expect("oh no");
 }
 
 fn write_error(error: request::HTTPError, mut stream: TcpStream) {

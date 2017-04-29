@@ -1,4 +1,4 @@
-struct SHA1Context {
+pub struct SHA1Context {
     input_buffer: [u8; 64],
     input_index: usize,
     length: u64,
@@ -14,11 +14,11 @@ const H_INIT: [u32; 5] = [
 ];
 
 impl SHA1Context {
-    fn new() -> SHA1Context {
+    pub fn new() -> SHA1Context {
         SHA1Context { input_buffer: [0; 64], input_index: 0, length: 0, h: H_INIT }
     }
 
-    fn add(&mut self, mut new_input: &[u8]) {
+    pub fn add(&mut self, mut new_input: &[u8]) {
         self.length += new_input.len() as u64;
         let mut bytes_til_full_block = self.input_buffer.len() - self.input_index;
 
@@ -43,7 +43,7 @@ impl SHA1Context {
         self.input_index += new_input.len();
     }
 
-    fn digest(&mut self) -> [u8; 20] {
+    pub fn digest(&mut self) -> [u8; 20] {
         self.input_buffer[self.input_index] = 0x80;
 
         for index in (self.input_index + 1)..self.input_buffer.len() {
@@ -100,9 +100,9 @@ impl SHA1Context {
 }
 
 fn bytes_to_word(bytes: [u8; 4]) -> u32 {
-    ((bytes[0] as u32) << 24) +
-        ((bytes[1] as u32) << 16) +
-        ((bytes[2] as u32) << 8) +
+    ((bytes[0] as u32) << 24) |
+        ((bytes[1] as u32) << 16) |
+        ((bytes[2] as u32) << 8) |
         bytes[3] as u32
 }
 
